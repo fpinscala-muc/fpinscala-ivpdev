@@ -113,6 +113,10 @@ trait Stream[+A] {
     }
   }
 
+  def headOptionViaFoldRight: Option[A] = {
+    this.foldRight(None:Option[A])((h,acc) => Some(h))
+  }
+
   def map[B](f: A => B): Stream[B] = {
     def go(str: Stream[A]): Stream[B] = {
       str match {
