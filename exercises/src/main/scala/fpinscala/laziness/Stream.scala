@@ -69,23 +69,65 @@ trait Stream[+A] {
 
   def takeViaUnfold(n: Int): Stream[A] = sys.error("todo")
 
-  def drop(n: Int): Stream[A] = sys.error("todo")
+  def drop(n: Int): Stream[A] = {
+    def go(str: Stream[A], i: Int): Stream[A] = {
+      str match {
+        case Empty => Empty
+        case Cons(h, t) if (n == i) => cons[A](h(), t())
+        case Cons(h, t) => go(t(), i+1)
+      }
+    }
+    go(this, 0)
+  }
 
-  def takeWhile(p: A => Boolean): Stream[A] = sys.error("todo")
+  def takeWhile(p: A => Boolean): Stream[A] = {
+      def go(str: Stream[A], acc: Stream[A]): Stream[A] = {
+        str match {
+          case Cons(h, t) if p(h()) => go(t(), cons(h(), acc))
+          case _ => acc
+        }
+      }
+      go(this, Empty).reverse()
+    }
 
   def takeWhileViaUnfold(p: A => Boolean): Stream[A] = sys.error("todo")
 
-  def forAll(p: A => Boolean): Boolean = sys.error("todo")
+  def forAll(p: A => Boolean): Boolean = {
+    def go(str: Stream[A]): Boolean = {
+      str match {
+        case Cons(h, t) => p(h()) && go(t())
+        case _ => true
+      }
+    }
+    go(this)
+  }
 
-  def takeWhileViaFoldRight(p: A => Boolean): Stream[A] = sys.error("todo")
+  def takeWhileViaFoldRight(p: A => Boolean): Stream[A] = {
+    foldRight(Empty: Stream[A])((h, acc) => if (!p(h)) Empty else cons(h, acc))
+  }
 
-  def headOption: Option[A] = sys.error("todo")
+  def headOption: Option[A] = {
+    this match {
+      case Empty => None
+      case Cons(h,t) => Some(h())
+    }
+  }
 
-  def map[B](f: A => B): Stream[B] = sys.error("todo")
+  def map[B](f: A => B): Stream[B] = {
+    def go(str: Stream[A]): Stream[B] = {
+      str match {
+        case Empty => Empty
+        case Cons(h, t) => cons(f(h()), go(t()))
+      }
+    }
+    go(this)
+  }
 
   def mapViaUnfold[B](f: A => B): Stream[B] = sys.error("todo")
 
-  def filter(p: A => Boolean): Stream[A] = sys.error("todo")
+  def filter(p: A => Boolean): Stream[A] = {
+    this.foldRight(Empty:Stream[A])((h, acc) => if (p(h)) cons[A](h, acc) else acc)
+  }
 
   def append[B>:A](other: Stream[B]): Stream[B] = sys.error("todo")
 
