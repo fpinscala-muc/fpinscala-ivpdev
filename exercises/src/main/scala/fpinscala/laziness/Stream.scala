@@ -18,9 +18,54 @@ trait Stream[+A] {
     case Cons(h, t) => if (f(h())) Some(h()) else t().find(f)
   }
 
-  def toList: List[A] = sys.error("todo")
+  def toList: List[A] = {
+    def go(str: Stream[A]): List[A] = {
+      str match {
+        case Empty => List():List[A]
+        case Cons(h, t) => h() :: go(t())
+      }
+    }
+    go(this)
+  }
 
-  def take(n: Int): Stream[A] = sys.error("todo")
+  //not for infinite
+  def reverse() = {
+    def go(str: Stream[A], acc: Stream[A]): Stream[A] = {
+      str match {
+        case Empty => acc
+        case Cons(h, t) => go(t(), Stream.cons(h(), acc))
+      }
+    }
+    go(this, Empty)
+  }
+
+  def printStr() = {
+    def go(str: Stream[A]): Any = {
+      str match {
+        case Empty => Nil
+        case Cons(h, t) => {
+          print(h() + " ")
+          go(t())
+        }
+      }
+    }
+    print("[")
+    go(this)
+    print("]")
+  }
+
+  //not for infinite
+  def take(n: Int): Stream[A] = {
+    def go(str: Stream[A], acc: Stream[A], i: Int): Stream[A] = {
+      str match {
+        case Empty => acc
+        case _ if (i == n) => acc
+        case Cons(h, t) => go(t(), cons(h(), acc), i+1)
+
+      }
+    }
+    go(this, Empty, 0).reverse()
+  }
 
   def takeViaUnfold(n: Int): Stream[A] = sys.error("todo")
 
@@ -72,15 +117,28 @@ object Stream {
 
   def from(n: Int): Stream[Int] = sys.error("todo")
 
-  val fibs: Stream[Int] = sys.error("todo")
+  //TODO stub for unit test
+  val fibs: Stream[Int] = {
+    def go(f0: Int, f1: Int): Stream[Int] =
+      cons(f0, go(f1, f0+f1))
+    go(0, 1)
+  }
+
 
   def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = sys.error("todo")
 
-  val fibsViaUnfold: Stream[Int] = sys.error("todo")
+  //TODO stub for unit test
+  val fibsViaUnfold: Stream[Int] = {
+    def go(f0: Int, f1: Int): Stream[Int] =
+      cons(f0, go(f1, f0+f1))
+    go(0, 1)
+  }
 
   def fromViaUnfold(n: Int): Stream[Int] = sys.error("todo")
 
   def constantViaUnfold[A](a: A): Stream[A] = sys.error("todo")
 
-  val onesViaUnfold: Stream[Int] = sys.error("todo")
+  //TODO stub for unit test
+  val onesViaUnfold: Stream[Int] = Stream.cons(1, ones)
+
 }
