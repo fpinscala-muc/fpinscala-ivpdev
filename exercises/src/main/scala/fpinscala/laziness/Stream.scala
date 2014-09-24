@@ -133,9 +133,13 @@ trait Stream[+A] {
     this.foldRight(Empty:Stream[A])((h, acc) => if (p(h)) cons[A](h, acc) else acc)
   }
 
-  def append[B>:A](other: Stream[B]): Stream[B] = sys.error("todo")
+  def append[B>:A](other: Stream[B]): Stream[B] = {
+    this.foldRight(other)((h,acc) => cons(h, acc))
+  }
 
-  def flatMap[B](f: A => Stream[B]): Stream[B] = sys.error("todo")
+  def flatMap[B](f: A => Stream[B]): Stream[B] = {
+    this.foldRight(Empty:Stream[B])((h, acc) => f(h).append(acc))
+  }
 
   def zipWith[B,C](s2: Stream[B])(f: (A,B) => C): Stream[C] = sys.error("todo")
 
@@ -159,32 +163,50 @@ object Stream {
 
   val ones: Stream[Int] = Stream.cons(1, ones)
 
-  def constant[A](a: A): Stream[A] = sys.error("todo")
+  def constant[A](a: A): Stream[A] = {
+    Stream.cons(a, constant(a))
+  }
 
-  def from(n: Int): Stream[Int] = sys.error("todo")
+  def from(n: Int): Stream[Int] = {
+    Stream.cons(n, from(n + 1))
+  }
 
-  //TODO stub for unit test
+
   val fibs: Stream[Int] = {
-    def go(f0: Int, f1: Int): Stream[Int] =
-      cons(f0, go(f1, f0+f1))
+    def go(current: Int, next: Int): Stream[Int] = {
+      Stream.cons(current, go(next, next + current))
+    }
     go(0, 1)
   }
 
 
-  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = sys.error("todo")
+  def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = {
+    def go(acc: Stream[A], zz: S):Stream[A] = {
+      f(zz) match {
+        case None => acc
+        case Some(t:(A,S)) => go(Stream.cons(t._1, acc), t._2)
+      }
+    }
+    go(Empty,z).reverse()
+  }
 
-  //TODO stub for unit test
   val fibsViaUnfold: Stream[Int] = {
-    def go(f0: Int, f1: Int): Stream[Int] =
-      cons(f0, go(f1, f0+f1))
-    go(0, 1)
+    var limit = 100
+    unfold[Int, (Int,Int)]((0,1))((i:(Int,Int)) => if (i._1 > limit) None
+                                                else Some((i._1,(i._2, i._1 + i._2))))
   }
 
-  def fromViaUnfold(n: Int): Stream[Int] = sys.error("todo")
+  def fromViaUnfold(n: Int): Stream[Int] = {
+    var limit = 100
+    unfold(n)(nn => if (nn > limit) None else Some((nn, nn + 1)))
+  }
 
-  def constantViaUnfold[A](a: A): Stream[A] = sys.error("todo")
 
-  //TODO stub for unit test
-  val onesViaUnfold: Stream[Int] = Stream.cons(1, ones)
+  def constantViaUnfold[A](a: A): Stream[A] = {
+    var limit = 1000
+    unfold(a)(a => if (limit == 0) None else {limit = limit - 1; Some(a,a)})
+  }
+
+  val onesViaUnfold: Stream[Int] = constantViaUnfold(1)
 
 }
