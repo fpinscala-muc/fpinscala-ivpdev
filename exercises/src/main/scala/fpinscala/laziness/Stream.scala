@@ -143,7 +143,13 @@ trait Stream[+A] {
 
   def zipWith[B,C](s2: Stream[B])(f: (A,B) => C): Stream[C] = sys.error("todo")
 
-  def startsWith[A](s: Stream[A]): Boolean = sys.error("todo")
+  def zipAll[B](s2: Stream[B]): Stream[(Option[A], Option[B])] = sys.error("todo")
+
+  def startsWith[B](s: Stream[B]): Boolean = sys.error("todo")
+
+  def tails: Stream[Stream[A]] = sys.error("todo using unfold")
+
+  def scanRight[B](s: B)(f: (A, B) => B): Stream[B] = sys.error("todo")
 }
 case object Empty extends Stream[Nothing]
 case class Cons[+A](h: () => A, t: () => Stream[A]) extends Stream[A]
@@ -171,6 +177,7 @@ object Stream {
     Stream.cons(n, from(n + 1))
   }
 
+  lazy val fibs: Stream[Int] = sys.error("todo")
 
   val fibs: Stream[Int] = {
     def go(current: Int, next: Int): Stream[Int] = {
@@ -179,6 +186,7 @@ object Stream {
     go(0, 1)
   }
 
+  lazy val fibsViaUnfold: Stream[Int] = sys.error("todo")
 
   def unfold[A, S](z: S)(f: S => Option[(A, S)]): Stream[A] = {
     def go(acc: Stream[A], zz: S):Stream[A] = {
@@ -209,4 +217,5 @@ object Stream {
 
   val onesViaUnfold: Stream[Int] = constantViaUnfold(1)
 
+  lazy val onesViaUnfold: Stream[Int] = sys.error("todo")
 }
