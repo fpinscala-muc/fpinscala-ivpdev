@@ -9,7 +9,7 @@ object Par {
 
   def unit[A](a: A): Par[A] = (es: ExecutorService) => UnitFuture(a) // `unit` is represented as a function that returns a `UnitFuture`, which is a simple implementation of `Future` that just wraps a constant value. It doesn't use the `ExecutorService` at all. It's always done and can't be cancelled. Its `get` method simply returns the value that we gave it.
 
-  def lazyUnit[A](a: => A): Par[A] = ???
+  def lazyUnit[A](a: => A): Par[A] = fork(unit(a))
 
   private case class UnitFuture[A](get: A) extends Future[A] {
     def isDone = true 
@@ -30,18 +30,42 @@ object Par {
       def call = a(es).get
     })
 
-  def asyncF[A,B](f: A => B): A => Par[B] = ???
+  def asyncF[A,B](f: A => B): A => Par[B] = {
+    a: A => lazyUnit(f(a))
+  }
 
   def map[A,B](pa: Par[A])(f: A => B): Par[B] = 
     map2(pa, unit(()))((a,_) => f(a))
 
   def sortPar(parList: Par[List[Int]]) = map(parList)(_.sorted)
 
-  def sequence[A](as: List[Par[A]]): Par[List[A]] = ???
+  //non-parallel
+  def sequenceDummy[A](l:  List[Par[A]]): Par[List[A]] = {
+    es =>
+    lazy val la : List[A] = l.map { pa: Par[A] => run(es)(pa).get }
+    lazyUnit(la)(es)
+  }
 
-  def parFilter[A](l: List[A])(f: A => Boolean): Par[List[A]] = ???
+  def sequence[A](l:  List[Par[A]]): Par[List[A]] = ???
 
-  def equal[A](e: ExecutorService)(p: Par[A], p2: Par[A]): Boolean = 
+  def parFilter[A](l: List[A])(f: A => Boolean): Par[List[A]] = {
+    //parallel computation of predicate functions on all list elements
+    val computedPredicates: Par[List[(A, Boolean)]] = parMap[A, (A, Boolean)](l) { a:A => (a,f(a)) }
+
+    //non-parallel filtering for already computed predicate results
+    def filterBool(i: List[(A, Boolean)]): List[A] = {
+      i.foldRight(List(): List[A]){(a:(A,Boolean), b:List[A]) => if (a._2) a._1::b else b }
+    }
+
+    map(computedPredicates){ a => filterBool(a) }
+  }
+
+  def parMap[A,B](l: List[A])(f: A => B): Par[List[B]] = fork {
+    val fbs: List[Par[B]] = l.map(asyncF(f))
+    sequence(fbs)
+  }
+
+  def equal[A](e: ExecutorService)(p: Par[A], p2: Par[A]): Boolean =
     p(e).get == p2(e).get
 
   def delay[A](fa: => Par[A]): Par[A] = 
@@ -52,21 +76,49 @@ object Par {
       if (run(es)(cond).get) t(es) // Notice we are blocking on the result of `cond`.
       else f(es)
 
-  def choiceN[A](n: Par[Int])(choices: List[Par[A]]): Par[A] = ???
+  def choiceN[A](n: Par[Int])(choices: List[Par[A]]): Par[A] = {
+    es =>
+      val res: Par[A] = choices(run(es)(n).get)
+      run(es)(res)
+  }
 
-  def choiceViaChoiceN[A](a: Par[Boolean])(ifTrue: Par[A], ifFalse: Par[A]): Par[A] = ???
+  def choiceViaChoiceN[A](a: Par[Boolean])(ifTrue: Par[A], ifFalse: Par[A]): Par[A] = {
+      val ls = ifTrue :: ifFalse :: Nil
+      val idx:Par[Int] = map[Boolean,Int](a){ cond:Boolean => if (cond) 0 else 1}
 
-  def choiceMap[K,V](key: Par[K])(choices: Map[K,Par[V]]): Par[V] = ???
+      choiceN(idx)(ls)
+  }
 
-  def chooser[A,B](pa: Par[A])(choices: A => Par[B]): Par[B] = ???
+  def choiceMap[K,V](key: Par[K])(choices: Map[K,Par[V]]): Par[V] = {
+    es =>
+      val res: Par[V] = choices(run(es)(key).get)
+      run(es)(res)
+  }
 
-  def choiceViaChooser[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] = ???
+  def chooser[A,B](pa: Par[A])(choices: A => Par[B]): Par[B] = {
+    es =>
+      val res: Par[B] = choices(run(es)(pa).get)
+      run(es)(res)
+  }
 
-  def choiceNViaChooser[A](n: Par[Int])(choices: List[Par[A]]): Par[A] = ???
+  def choiceViaChooser[A](cond: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] = {
+    def choices(b: Boolean): Par[A] = {
+      if (b) t else f
+    }
+    chooser(cond)(choices)
+  }
+
+  def choiceNViaChooser[A](n: Par[Int])(choices: List[Par[A]]): Par[A] = {
+    chooser(n){nn => choices(nn)}
+  }
 
   def flatMap[A,B](pa: Par[A])(f: A => Par[B]): Par[B] = ???
 
-  def join[A](ppa: Par[Par[A]]): Par[A] = ???
+  def join[A](ppa: Par[Par[A]]): Par[A] = {
+    es =>
+      val pa: Par[A] = run(es)(ppa).get()
+      pa(es)
+  }
 
   def flatMapViaJoin[A,B](pa: Par[A])(f: A => Par[B]): Par[B] = ???
 
