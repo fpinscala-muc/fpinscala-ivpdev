@@ -39,16 +39,20 @@ object Par {
 
   def sortPar(parList: Par[List[Int]]) = map(parList)(_.sorted)
 
-  //non-parallel
-  def sequenceDummy[A](l:  List[Par[A]]): Par[List[A]] = {
-    es =>
-    lazy val la : List[A] = l.map { pa: Par[A] => run(es)(pa).get }
-    lazyUnit(la)(es)
+
+  def sequence[A](l:  List[Par[A]]): Par[List[A]] = {
+    l.foldRight(Par.unit[List[A]](List[A]())){ (a: Par[A], acc: Par[List[A]]) =>
+      map2(a, acc){ _ :: _ }
+    }
   }
 
-  def sequence[A](l:  List[Par[A]]): Par[List[A]] = ???
-
   def parFilter[A](l: List[A])(f: A => Boolean): Par[List[A]] = {
+    l.foldRight(Par.unit[List[A]](List[A]())) { (a: A, pla: Par[List[A]]) =>
+      map2(Par.lazyUnit(a), pla){ (aa: A, la: List[A] ) => if (f(a)) a :: la else la }
+    }
+  }
+
+  def parFilter2[A](l: List[A])(f: A => Boolean): Par[List[A]] = {
     //parallel computation of predicate functions on all list elements
     val computedPredicates: Par[List[(A, Boolean)]] = parMap[A, (A, Boolean)](l) { a:A => (a,f(a)) }
 
@@ -112,7 +116,7 @@ object Par {
     chooser(n){nn => choices(nn)}
   }
 
-  def flatMap[A,B](pa: Par[A])(f: A => Par[B]): Par[B] = ???
+  def flatMap[A,B](pa: Par[A])(f: A => Par[B]): Par[B] = chooser(pa)(f)
 
   def join[A](ppa: Par[Par[A]]): Par[A] = {
     es =>
@@ -120,9 +124,9 @@ object Par {
       pa(es)
   }
 
-  def flatMapViaJoin[A,B](pa: Par[A])(f: A => Par[B]): Par[B] = ???
+  def flatMapViaJoin[A,B](pa: Par[A])(f: A => Par[B]): Par[B] = join(map(pa)(f))
 
-  def joinViaFlatMap[A](ppa: Par[Par[A]]): Par[A] = ???
+  def joinViaFlatMap[A](ppa: Par[Par[A]]): Par[A] = flatMap(ppa)(a => a)
 
   /* Gives us infix syntax for `Par`. */
   implicit def toParOps[A](p: Par[A]): ParOps[A] = new ParOps(p)
